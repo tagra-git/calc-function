@@ -4,6 +4,14 @@ import sympy as sp
 import numpy as np
 import matplotlib.pyplot as plt
 import io
+import logging
+
+# ログ設定
+logging.basicConfig(
+    level=logging.INFO, 
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
+)
 
 st.set_page_config(page_title="数学電卓", layout="wide")
 
@@ -38,16 +46,23 @@ def update_expression(value):
                 formatted_expr = format_expression(st.session_state.expression)
                 x = sp.Symbol('x')
                 expr = formatted_expr.replace("^", "**").replace("log", "log10")
-                sympy_expr = sp.sympify(expr, evaluate=True)
 
-                if sympy_expr.is_number:
-                    result = sympy_expr.evalf()
-                else:
-                    result = sympy_expr
-
-                st.session_state.result = result
+                try:
+                    sympy_expr = sp.sympify(expr, evaluate=True)
+                    result = sympy_expr.evalf() if sympy_expr.is_number else sympy_expr
+                    st.session_state.result = result
+                except sp.SympifyError:  # ✅ 数式の書式エラー
+                    logging.warning(f"数式のエラー: {st.session_state.expression}")
+                    st.session_state.result = "数式の書式が正しくありません。"
+                except ValueError:  # ✅ 計算エラー
+                    logging.warning(f"計算エラー: {st.session_state.expression}")
+                    st.session_state.result = "計算エラー：入力を確認してください。"
+                except Exception as e:  # ✅ その他のエラー
+                    logging.error(f"未知のエラー: {e}")
+                    st.session_state.result = "内部エラーが発生しました。"
             except Exception as e:
-                st.session_state.result = f"エラー: {e}"
+                logging.error(f"数式の処理中にエラー: {e}")
+                st.session_state.result = "内部エラーが発生しました。"
     elif value == "π":
         st.session_state.expression += "pi"
     elif value == "e":
@@ -137,4 +152,5 @@ if st.session_state.result and "x" in st.session_state.expression:
         )
 
     except Exception as e:
-        st.error(f"グラフ描画エラー: {e}")
+        logging.error(f"グラフ描画エラー: {e}")
+        st.error("グラフを描画できませんでした。")
